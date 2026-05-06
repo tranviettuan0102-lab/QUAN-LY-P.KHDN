@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // RBAC
+    function getUserData(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
+    function isSuperAdmin() { return isVerified() && (request.auth.token.email == 'tranviettuan0102@gmail.com' || request.auth.token.email == 'phongkhdndanang@gmail.com'); }
+    function isManager() { 
+      return isSuperAdmin() || (
+        isVerified() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserData(request.auth.uid).get('role', '') == 'Manager'
+      );
+    }
+    function isOwner(uid) { return isVerified() && request.auth.uid == uid; }
+
+    // --- Validation Helpers ---
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'role', 'email'])
+          && (data.id == request.auth.uid || isManager())
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+          && data.role in ['RM', 'Manager']
+          && data.email is string && data.email.size() > 0;
+    }
+
+    function isValidKPI(data) {
+      return data.keys().hasAll(['id', 'userId', 'type', 'target', 'actual', 'month', 'year'])
+          && data.keys().size() == 7
+          && isValidId(data.id)
+          && isValidId(data.userId)
+          && data.type in ['Dư nợ', 'Huy động', 'Thẻ tín dụng', 'CIF active', 'Doanh số TTQT', 'Thu thuần dịch vụ', 'Bảo hiểm']
+          && data.target is number
+          && data.actual is number
+          && data.month is number && data.month >= 1 && data.month <= 12
+          && data.year is number && data.year >= 2024;
+    }
+
+    function isValidDossier(data) {
+      return data.keys().hasAll(['id', 'customerName', 'category', 'type', 'status', 'amount', 'updatedAt', 'userId'])
+          && data.keys().size() == 8
+          && isValidId(data.id)
+          && data.category in ['Cấp tín dụng', 'Trình khác']
+          && data.customerName is string && data.customerName.size() <= 200
+          && data.status in ['Đang soạn', 'Phê duyệt', 'Giải ngân', 'Từ chối']
+          && data.amount is number
+          && (data.updatedAt == request.time || data.updatedAt is string)
+          && data.userId == request.auth.uid;
+    }
+
+    function isValidYearlyPlan(data) {
+      return data.keys().hasAll(['id', 'userId', 'type', 'target', 'year'])
+          && data.keys().size() == 5
+          && isValidId(data.id)
+          && isValidId(data.userId)
+          && data.type in ['Dư nợ', 'Huy động', 'Thẻ tín dụng', 'CIF active', 'Doanh số TTQT', 'Thu thuần dịch vụ', 'Bảo hiểm']
+          && data.target is number
+          && data.year is number && data.year >= 2024;
+    }
+
+    function isValidKpiDetail(data) {
+      return data.keys().hasAll(['id', 'kpiId', 'customerName', 'cif', 'amount', 'date'])
+          && data.keys().size() == 6
+          && isValidId(data.id)
+          && isValidId(data.kpiId)
+          && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 200
+          && data.cif is string && data.cif.size() > 0 && data.cif.size() <= 50
+          && data.amount is number
+          && data.date is string && data.date.size() <= 20;
+    }
+
+    // --- Rules ---
+
+    match /users/{userId} {
+      allow list: if isVerified();
+      allow get: if isVerified();
+      allow create: if isVerified() && (userId == request.auth.uid || isManager());
+      allow update: if isVerified() && (isOwner(userId) || isManager());
+      allow delete: if isVerified() && isManager();
+    }
+
+    match /yearlyPlans/{planId} {
+      allow list, get: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      allow create, update: if isManager() && isValidYearlyPlan(incoming());
+    }
+
+    match /kpiDetails/{detailId} {
+      allow list, get: if isVerified();
+      allow create: if isVerified() && isValidKpiDetail(incoming());
+      allow update, delete: if isManager();
+    }
+
+    match /kpis/{kpiId} {
+      allow list, get: if isVerified();
+      
+      allow create: if isManager() && isValidKPI(incoming());
+      
+      allow update: if isVerified() && isValidKPI(incoming()) && (
+        isManager() || 
+        (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['actual']))
+      );
+    }
+
+    match /dossiers/{dossierId} {
+      allow list: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      allow get: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      
+      allow create: if isVerified() && isValidDossier(incoming());
+      
+      allow update: if isVerified() && isOwner(existing().userId) && isValidDossier(incoming())
+                    && existing().status != 'Giải ngân' // Terminal state locking
+                    && incoming().userId == existing().userId; // Immutable userId
+      
+      allow delete: if isVerified() && isOwner(existing().userId) && existing().status == 'Đang soạn';
+    }
+
+    match /customers/{customerId} {
+      allow list: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      allow get: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && incoming().userId == request.auth.uid;
+      allow update, delete: if isVerified() && existing().userId == request.auth.uid;
+    }
+
+    match /logs/{logId} {
+      allow list: if isVerified() && (isManager() || resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && incoming().userId == request.auth.uid;
+    }
+  }
+}

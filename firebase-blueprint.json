@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users (RM or Manager)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["RM", "Manager"] },
+        "avatar": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["id", "name", "role", "email"]
+    },
+    "KPI": {
+      "title": "KPI",
+      "description": "Business goals and achievement for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Dư nợ", "Huy động", "Bảo hiểm", "Thẻ", "CIF Active"] },
+        "target": { "type": "number" },
+        "actual": { "type": "number" }
+      },
+      "required": ["id", "userId", "type", "target", "actual"]
+    },
+    "Dossier": {
+      "title": "Dossier",
+      "description": "Loan/Service application profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "category": { "type": "string", "enum": ["Cấp tín dụng", "Trình khác"] },
+        "type": { "type": "string" },
+        "status": { "type": "string", "enum": ["Đang soạn", "Phê duyệt", "Giải ngân", "Từ chối"] },
+        "amount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "customerName", "category", "type", "status", "userId"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Potential or existing customers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "type": { "type": "string", "enum": ["Nóng", "Ấm", "Lạnh"] },
+        "notes": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "name", "userId"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Daily work activity records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "description": { "type": "string" },
+        "result": { "type": "string" }
+      },
+      "required": ["id", "date", "userId", "description"]
+    },
+    "YearlyPlan": {
+      "title": "YearlyPlan",
+      "description": "Annual business plan target",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "year": { "type": "number" },
+        "type": { "type": "string" },
+        "target": { "type": "number" }
+      },
+      "required": ["id", "userId", "year", "type", "target"]
+    },
+    "KpiDetail": {
+      "title": "KpiDetail",
+      "description": "Detail records for a KPI achievement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kpiId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "cif": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "kpiId", "customerName", "cif", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Collection of system users"
+    },
+    "kpis": {
+      "schema": "KPI",
+      "description": "Collection of business performance indicators"
+    },
+    "dossiers": {
+      "schema": "Dossier",
+      "description": "Collection of loan application profiles"
+    },
+    "customers": {
+      "schema": "Customer",
+      "description": "Collection of customer leads"
+    },
+    "logs": {
+      "schema": "ActivityLog",
+      "description": "Collection of daily activity logs"
+    },
+    "yearlyPlans": {
+      "schema": "YearlyPlan",
+      "description": "Collection of annual business plans"
+    },
+    "kpiDetails": {
+      "schema": "KpiDetail",
+      "description": "Collection of KPI detail records"
+    }
+  }
+}
