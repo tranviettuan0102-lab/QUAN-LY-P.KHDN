@@ -1144,20 +1144,81 @@ export default function App() {
         </div>
 
         <Card title="Lịch sử hoạt động gần đây">
-          <div className="space-y-4">
-            {logs.map((log) => (
-              <div key={log.id} className="flex gap-4 p-3 rounded-lg border border-slate-50 hover:bg-slate-50 transition-all">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2" />
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <p className="text-xs font-bold text-slate-900">{log.description}</p>
-                    <span className="text-[9px] font-mono text-slate-400">{log.date}</span>
+          {currentUser?.role === 'Manager' ? (() => {
+            const grouped: Record<string, Record<string, ActivityLog[]>> = {};
+            const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            sortedLogs.forEach(log => {
+              const dateObj = new Date(log.date);
+              const dateStrRaw = isNaN(dateObj.getTime()) ? log.date : format(dateObj, 'dd/MM/yyyy');
+              if (!grouped[dateStrRaw]) grouped[dateStrRaw] = {};
+              if (!grouped[dateStrRaw][log.userId]) grouped[dateStrRaw][log.userId] = [];
+              grouped[dateStrRaw][log.userId].push(log);
+            });
+            
+            return (
+              <div className="space-y-8">
+                {Object.keys(grouped).map(dateStr => (
+                  <div key={dateStr}>
+                    <h5 className="text-sm font-black text-[#1a2b4b] mb-4 pb-2 border-b border-slate-200">{dateStr}</h5>
+                    <div className="space-y-6">
+                      {Object.keys(grouped[dateStr]).map(uId => {
+                        const user = allUsers.find(u => u.id === uId);
+                        const userName = user ? user.name : 'Unknown User';
+                        return (
+                          <div key={uId} className="ml-2">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">
+                                {userName.charAt(0).toUpperCase()}
+                              </div>
+                              <h6 className="text-xs font-bold text-blue-800 uppercase tracking-wide">{userName}</h6>
+                            </div>
+                            <div className="space-y-3 border-l-2 border-slate-100 ml-3 pl-4">
+                              {grouped[dateStr][uId].map(log => {
+                                 const logDateObj = new Date(log.date);
+                                 const timeStr = isNaN(logDateObj.getTime()) ? '' : format(logDateObj, 'HH:mm');
+                                 return (
+                                  <div key={log.id} className="relative group">
+                                    <div className="absolute -left-[21px] top-2 w-2 h-2 rounded-full bg-slate-300 group-hover:bg-blue-500 transition-colors" />
+                                    <div className="bg-white p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all">
+                                      <div className="flex justify-between items-start">
+                                        <p className="text-xs font-bold text-slate-800">{log.description}</p>
+                                        <span className="text-[10px] font-mono text-slate-400 font-medium">{timeStr}</span>
+                                      </div>
+                                      {log.result && <p className="text-[11px] text-slate-600 mt-1">{log.result}</p>}
+                                    </div>
+                                  </div>
+                                 );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{log.result}</p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })() : (
+            <div className="space-y-4">
+              {logs.map((log) => {
+                const logDateObj = new Date(log.date);
+                const isValidDate = !isNaN(logDateObj.getTime());
+                const dateStr = isValidDate ? format(logDateObj, 'dd/MM/yyyy HH:mm') : log.date;
+                return (
+                  <div key={log.id} className="flex gap-4 p-3 rounded-lg border border-slate-50 hover:bg-slate-50 transition-all">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2" />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <p className="text-xs font-bold text-slate-900">{log.description}</p>
+                        <span className="text-[9px] font-mono text-slate-400">{dateStr}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{log.result}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       </div>
     </div>
